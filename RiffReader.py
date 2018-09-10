@@ -1,5 +1,8 @@
 import os
 
+"""
+Read a RIFF (WAVE) file and return the data
+"""
 class RiffException(Exception):
    def __init__(self, arg):
       self.args = [arg]
@@ -52,55 +55,57 @@ class RiffReader:
     INFO_ID = "INFO"
 
     def __init__(self):
-        self.fileStream = None
-        self.buffer = None
-        self.filePath = ""
-        self.fileName = ""
-        self.fileHeaderID = "    "
-        self.rootChunk = ""
-        self.fileSize = 0
-        self.fileSizeLeft = 0
-        self.chunkID = None
-        self.chunkSize = 0
-        self.chunkSizeLeft = 0
-        self.riffFormat = RiffFormat()
+        self.__fileStream = None
+        self.__buffer = None
+        self.__filePath = ""
+        self.__fileName = ""
+        self.__fileHeaderID = "    "
+        self.__rootChunk = ""
+        self.__fileSize = 0
+        self.__fileSizeLeft = 0
+        self.__chunkID = None
+        self.__chunkSize = 0
+        self.__chunkSizeLeft = 0
+        self.__riffFormat = RiffFormat()
 
     def getFormat(self):
-        return self.riffFormat.clone()
+        return self.__riffFormat.clone()
 
     def getFileType(self):
-        return self.fileHeaderID
+        return self.__fileHeaderID
 
+    # open a RIFF (WAVE) file
     def open(self, filePath):
         size = 0
         id = None
 
         try:
-            self.filePath = os.path.abspath(filePath)
-            self.fileName = os.path.basename(filePath)
-            self.fileSize = os.path.getsize(filePath)
-            self.fileSizeLeft = self.fileSize
+            self.__filePath = os.path.abspath(filePath)
+            self.__fileName = os.path.basename(filePath)
+            self.__fileSize = os.path.getsize(filePath)
+            self.__fileSizeLeft = self.__fileSize
             self.__close()
 
-            self.fileStream = open(filePath, "rb")
+            self.__fileStream = open(filePath, "rb")
 
         except IOError:
-            raise RiffException("{filePath} may not exist.".format(filePath = self.filePath))
+            raise RiffException("{filePath} may not exist.".format(filePath = self.__filePath))
         except:
-            raise RiffException("File problem with {filePath}.".format(filePath = self.filePath))
+            raise RiffException("File problem with {filePath}.".format(filePath = self.__filePath))
 
-        self.rootChunk = self.__readID()
-        if not self.rootChunk.casefold() == RiffReader.RIFF_ID.casefold() and \
-            not self.rootChunk.casefold() == RiffReader.RIFX_ID.casefold():
-            raise RiffException("Unknown root ID, {rootChunk}.".format(rootChunk = self.rootChunk))
+        self.__rootChunk = self.__readID()
+        if not self.__rootChunk.casefold() == RiffReader.RIFF_ID.casefold() and \
+            not self.__rootChunk.casefold() == RiffReader.RIFX_ID.casefold():
+            raise RiffException("Unknown root ID, {rootChunk}.".format(rootChunk = self.__rootChunk))
         size = self.__readSize()
-        if size > self.fileSizeLeft:
+        if size > self.__fileSizeLeft:
             raise RiffException("Data size of main id is too big, {size}".format(size = size))
-        self.fileHeaderID = self.__readID()
+        self.__fileHeaderID = self.__readID()
         id = self.__nextChunk()
         return id
 
 
+    # read the entire file
     def readAll(self, filePath):
         buffer = bytearray()
         totalSize = 0
@@ -120,13 +125,13 @@ class RiffReader:
         self.__close()
         return (totalSize, buffer)
 
-
+    # read size bytes of the file
     def readBytes(self, size):
         readSize = 0
         buffer = None
 
-        while self.chunkID != None:
-            if self.chunkSizeLeft > 0:
+        while self.__chunkID != None:
+            if self.__chunkSizeLeft > 0:
                 (readSize, buffer) = self.__readChunk(size)
                 break
             else:
@@ -134,26 +139,27 @@ class RiffReader:
         return (readSize, buffer)
 
     def __close(self):
-        if self.fileStream != None:
+        if self.__fileStream != None:
             try:
-                self.fileStream.flush()
-                self.fileStream.close()
+                self.__fileStream.flush()
+                self.__fileStream.close()
             except:
                 pass
 
+    # read next chunk of data, skipping irrelevant chunks
     def __nextChunk(self):
         id = None
         size = 0
 
-        if self.chunkSizeLeft > 0:
-            self.fileStream.seek(self.chunkSizeLeft, 1)
-            self.fileSizeLeft -= self.chunkSize
-            self.chunkSize = 0
-            self.chunkSizeLeft = 0
-            self.chunkID = None
+        if self.__chunkSizeLeft > 0:
+            self.__fileStream.seek(self.__chunkSizeLeft, 1)
+            self.__fileSizeLeft -= self.__chunkSize
+            self.__chunkSize = 0
+            self.__chunkSizeLeft = 0
+            self.__chunkID = None
 
         while True:
-            if self.fileSizeLeft > (RiffReader.INT_SIZE + RiffReader.INT_SIZE):
+            if self.__fileSizeLeft > (RiffReader.INT_SIZE + RiffReader.INT_SIZE):
                 id = self.__readID()
                 if self.__isList(id):
                     dirSize = self.__readSize()
@@ -167,14 +173,14 @@ class RiffReader:
                     size = self.__readSize()
                     self.__readJunk(size)
                 else:
-                    self.chunkID = id
-                    self.chunkSize = self.__readSize()
-                    self.chunkSizeLeft = self.chunkSize
+                    self.__chunkID = id
+                    self.__chunkSize = self.__readSize()
+                    self.__chunkSizeLeft = self.__chunkSize
                     break
             else:
-                self.chunkID = None
-                self.chunkSize = 0
-                self.chunkSizeLeft = 0
+                self.__chunkID = None
+                self.__chunkSize = 0
+                self.__chunkSizeLeft = 0
                 id = None
                 break
 
@@ -185,27 +191,27 @@ class RiffReader:
     def __readChunk(self, readLen):
         buffer = None
 
-        if readLen > self.chunkSizeLeft:
-            readLen = self.chunkSizeLeft
+        if readLen > self.__chunkSizeLeft:
+            readLen = self.__chunkSizeLeft
 
         if readLen > 0:
-            buffer = self.fileStream.read(readLen)
-            self.fileSizeLeft -= readLen
-            self.chunkSizeLeft -= readLen
+            buffer = self.__fileStream.read(readLen)
+            self.__fileSizeLeft -= readLen
+            self.__chunkSizeLeft -= readLen
 
         return (readLen, buffer)
 
     def __readFmt(self, readLen):
         if readLen < 16:
             raise RiffException("Format chunk is too small, {readLen}.".format(readLen = readLen))
-        self.riffFormat.formatTag = self.__readShort();
-        self.riffFormat.channels = self.__readShort();
-        self.riffFormat.samplesPerSecond = self.__readInt();
-        self.riffFormat.avgBytesPerSecond = self.__readInt();
-        self.riffFormat.blockAlign = self.__readShort();
-        self.riffFormat.bitsPerSample = self.__readShort();
+        self.__riffFormat.formatTag = self.__readShort();
+        self.__riffFormat.channels = self.__readShort();
+        self.__riffFormat.samplesPerSecond = self.__readInt();
+        self.__riffFormat.avgBytesPerSecond = self.__readInt();
+        self.__riffFormat.blockAlign = self.__readShort();
+        self.__riffFormat.bitsPerSample = self.__readShort();
         if readLen >= 18:
-            self.riffFormat.cbSize = self.__readShort()
+            self.__riffFormat.cbSize = self.__readShort()
 
     def __readInfo(self, readLen):
         while readLen > 8:
@@ -218,17 +224,18 @@ class RiffReader:
             readLen -= size
 
     def __readJunk(self, readLen):
-        self.fileStream.seek(readLen, 1) # seek from current position
+        self.__fileStream.seek(readLen, 1) # seek from current position
 
+    # read string from the file
     def __readStr(self, readLen):
         strLen = readLen
         charList = []
         self.__readRawBytes(readLen)
         for i in range(readLen-1, 0, -1):
-            if self.buffer[i] == 0:
+            if self.__buffer[i] == 0:
                 strLen -= 1
         for i in range(strLen):
-            charList.append(chr(self.buffer[i]))
+            charList.append(chr(self.__buffer[i]))
         retVal = "".join(charList)
         return retVal
 
@@ -236,10 +243,10 @@ class RiffReader:
     def __readID(self):
         retVal = ""
         try:
-            cBuffer = self.fileStream.read(RiffReader.ID_SIZE)
+            cBuffer = self.__fileStream.read(RiffReader.ID_SIZE)
             if RiffReader.ID_SIZE != len(cBuffer):
                 raise RiffException("Error in id read size, {readLen}.".format(readLen = len(cBuffer)))
-            self.fileSizeLeft -= RiffReader.ID_SIZE
+            self.__fileSizeLeft -= RiffReader.ID_SIZE
             retVal = "".join((chr(cBuffer[0]), chr(cBuffer[1]), chr(cBuffer[2]), chr(cBuffer[3])))
         except:
             raise RiffException("Error reading an id.")
@@ -249,17 +256,17 @@ class RiffReader:
         size = self.__readInt()
         if (size & 1) == 1:
             size += 1
-        if size > self.fileSizeLeft:
+        if size > self.__fileSizeLeft:
             raise RiffException("Chunk size is too large, {size}.".format(size = size))
         return size
 
     def __readShort(self):
         retVal = 0
         try:
-            iBuffer = self.fileStream.read(RiffReader.SHORT_SIZE)
+            iBuffer = self.__fileStream.read(RiffReader.SHORT_SIZE)
             if RiffReader.SHORT_SIZE != len(iBuffer):
                 raise RiffException("Error in short read size, {readLen}.".format(readLen = len(iBuffer)))
-            self.fileSizeLeft -= RiffReader.SHORT_SIZE
+            self.__fileSizeLeft -= RiffReader.SHORT_SIZE
             retVal = int((iBuffer[1] << 8) | iBuffer[0])
         except:
             raise RiffException("Error reading a short.")
@@ -268,10 +275,10 @@ class RiffReader:
     def __readInt(self):
         retVal = 0
         try:
-            iBuffer = self.fileStream.read(RiffReader.INT_SIZE)
+            iBuffer = self.__fileStream.read(RiffReader.INT_SIZE)
             if RiffReader.INT_SIZE != len(iBuffer):
                 raise RiffException("Error in int read size, {readLen}.".format(readLen = len(iBuffer)))
-            self.fileSizeLeft -= RiffReader.INT_SIZE
+            self.__fileSizeLeft -= RiffReader.INT_SIZE
             retVal = int((iBuffer[3] << 24) | (iBuffer[2] << 16) | (iBuffer[1] << 8) | iBuffer[0])
         except:
             raise RiffException("Error reading an int.")
@@ -281,11 +288,11 @@ class RiffReader:
         if readLen > RiffReader.BUFF_SIZE:
             raise RiffException("number of bytes, {readLen} too large for internal buffer".format(readLen=readLen))
         try:
-            self.buffer = bytearray(self.fileStream.read(readLen))
-            size = len(self.buffer)
+            self.__buffer = bytearray(self.__fileStream.read(readLen))
+            size = len(self.__buffer)
             if readLen != size:
                 raise RiffException("Read length, {readLen}, does not match size, {size}, returned".format(readLen=readLen, size=size))
-            self.fileSizeLeft -= readLen
+            self.__fileSizeLeft -= readLen
         except:
             raise RiffException("Error reading file")
 
