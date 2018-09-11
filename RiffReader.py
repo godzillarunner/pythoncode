@@ -53,6 +53,7 @@ class RiffReader:
     LIST_ID = "LIST"
     SLNT_ID = "SLNT"
     INFO_ID = "INFO"
+    SCOT_ID = "SCOT"
 
     def __init__(self):
         self.__fileStream = None
@@ -169,6 +170,9 @@ class RiffReader:
                 elif self.__isFmt(id):
                     size = self.__readSize()
                     self.__readFmt(size)
+                elif self.__isScot(id):
+                    size = self.__readSize()
+                    self.__readJunk(size)
                 elif self.__isJunk(id):
                     size = self.__readSize()
                     self.__readJunk(size)
@@ -212,6 +216,8 @@ class RiffReader:
         self.__riffFormat.bitsPerSample = self.__readShort();
         if readLen >= 18:
             self.__riffFormat.cbSize = self.__readShort()
+        if readLen > 18:
+            self.__readRawBytes(readLen-18)
 
     def __readInfo(self, readLen):
         while readLen > 8:
@@ -313,6 +319,11 @@ class RiffReader:
 
     def __isJunk(self, id):
         if id.casefold() == RiffReader.JUNK_ID.casefold():
+            return True
+        return False
+
+    def __isScot(self, id):
+        if id.casefold() == RiffReader.SCOT_ID.casefold():
             return True
         return False
 
